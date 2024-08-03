@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,36 +11,43 @@
       margin: 0 auto;
       padding: 20px;
     }
+
     .title {
       font-size: 24px;
       font-weight: bold;
       margin-bottom: 20px;
     }
+
     .flex {
       display: flex;
       margin-bottom: 20px;
     }
+
     .select,
     .input {
       width: 100%;
       padding: 10px;
       margin-right: 10px;
     }
+
     .button {
       padding: 10px 20px;
       cursor: pointer;
     }
+
     .card {
       margin-bottom: 20px;
       border: 1px solid #ccc;
       padding: 10px;
     }
+
     .card img {
       width: 100%;
       height: 200px;
       object-fit: cover;
       margin-bottom: 10px;
     }
+
     .card-placeholder {
       width: 100%;
       height: 200px;
@@ -49,10 +57,12 @@
       justify-content: center;
       margin-bottom: 10px;
     }
+
     .card-title {
       font-weight: bold;
       margin-bottom: 10px;
     }
+
     .location-item {
       display: flex;
       align-items: center;
@@ -60,224 +70,202 @@
     }
   </style>
 </head>
+
 <body>
 
-<div class="container">
-  <h1 class="title">清掃作業写真記録</h1>
+  <div class="container">
+    <h1 class="title">清掃作業写真記録</h1>
 
-  <div class="flex">
-    <select id="locationSelect" class="select">
-      <option value="" selected disabled>作業場所を選択</option>
-    </select>
-    <button id="addLocationButton" class="button">＋</button>
+    <div class="flex">
+      <select id="locationSelect" class="select">
+        <option value="" selected disabled>作業場所を選択</option>
+      </select>
+      <button id="addLocationButton" class="button">＋</button>
+      <button id="removeLocationButton" class="button">−</button>
+    </div>
+
+    <div class="flex">
+      <button id="saveButton" class="button">保存</button>
+      <button id="loadButton" class="button">読み出し</button>
+      <button id="downloadButton" class="button">すべての写真をダウンロード</button>
+    </div>
+
+    <div id="cardsContainer"></div>
+
   </div>
 
-  <div id="newLocationDialog" style="display: none;">
-    <input id="newLocationInput" class="input" placeholder="新しい作業場所">
-    <button id="confirmAddLocationButton" class="button">追加</button>
-  </div>
+  <script>
+    let photos = {};
+    let locations = [];
+    let currentLocation = '';
 
-  <div id="cardsContainer"></div>
-
-  <div class="flex">
-    <button id="saveButton" class="button">保存</button>
-    <button id="loadButton" class="button">読み出し</button>
-    <button id="downloadButton" class="button">すべての写真をダウンロード</button>
-  </div>
-</div>
-
-<script>
-  let photos = {};
-  let locations = ['オフィス', 'レストラン', '学校'];
-  let currentLocation = '';
-
-  document.getElementById('locationSelect').addEventListener('change', (event) => {
-    currentLocation = event.target.value;
-    if (!photos[currentLocation]) {
-      photos[currentLocation] = { before: null, during: null, after: null };
-    }
-    renderCards();
-  });
-
-  document.getElementById('addLocationButton').addEventListener('click', () => {
-    document.getElementById('newLocationDialog').style.display = 'block';
-  });
-
-  document.getElementById('confirmAddLocationButton').addEventListener('click', () => {
-    const newLocation = document.getElementById('newLocationInput').value;
-    if (newLocation && !locations.includes(newLocation)) {
-      locations.push(newLocation);
-      currentLocation = newLocation;
-      photos[newLocation] = { before: null, during: null, after: null };
-      renderLocationOptions();
+    document.getElementById('locationSelect').addEventListener('change', (event) => {
+      currentLocation = event.target.value;
+      if (!photos[currentLocation]) {
+        photos[currentLocation] = { before: null, during: null, after: null };
+      }
       renderCards();
+    });
+
+    document.getElementById('addLocationButton').addEventListener('click', () => {
+      const newLocation = prompt("新しい作業場所名を入力");
+      if (newLocation && !locations.includes(newLocation)) {
+        locations.push(newLocation);
+        currentLocation = newLocation;
+        photos[newLocation] = { before: null, during: null, after: null };
+        renderLocationOptions();
+        renderCards();
+      }
+    });
+
+    document.getElementById('removeLocationButton').addEventListener('click', () => {
+      let sel = window.confirm(currentLocation + "を消去します");
+
+      if (currentLocation && sel) {
+        deleteLocation(currentLocation);
+      }
+    });
+
+    function renderLocationOptions() {
+      const select = document.getElementById('locationSelect');
+      select.innerHTML = '<option value="" selected disabled>作業場所を選択</option>';
+      locations.forEach(loc => {
+        const option = document.createElement('option');
+        option.value = loc;
+        option.textContent = loc;
+        select.appendChild(option);
+      });
+      select.value = currentLocation;
+      renderLocationList();
     }
-    document.getElementById('newLocationDialog').style.display = 'none';
-    document.getElementById('newLocationInput').value = '';
-  });
 
-  function renderLocationOptions() {
-    const select = document.getElementById('locationSelect');
-    select.innerHTML = '<option value="" selected disabled>作業場所を選択</option>';
-    locations.forEach(loc => {
-      const option = document.createElement('option');
-      option.value = loc;
-      option.textContent = loc;
-      select.appendChild(option);
-    });
-    select.value = currentLocation;
-    renderLocationList();
-  }
-
-  function renderLocationList() {
-    const select = document.getElementById('locationSelect');
-    select.innerHTML = '<option value="" selected disabled>作業場所を選択</option>';
-    locations.forEach(loc => {
-      const option = document.createElement('option');
-      option.value = loc;
-      option.textContent = loc;
-      select.appendChild(option);
-    });
-    select.value = currentLocation;
-
-    const container = document.getElementById('locationListContainer');
-    if (!container) {
-      const newContainer = document.createElement('div');
-      newContainer.id = 'locationListContainer';
-      select.parentElement.insertBefore(newContainer, select.nextSibling);
-    } else {
-      container.innerHTML = '';
+    function renderLocationList() {
+      const select = document.getElementById('locationSelect');
+      select.innerHTML = '<option value="" selected disabled>作業場所を選択</option>';
+      locations.forEach(loc => {
+        const option = document.createElement('option');
+        option.value = loc;
+        option.textContent = loc;
+        select.appendChild(option);
+      });
+      select.value = currentLocation;
     }
-    
-    locations.forEach(loc => {
-      const locationItem = document.createElement('div');
-      locationItem.className = 'location-item';
-      const locationText = document.createElement('span');
-      locationText.textContent = loc;
-      const deleteButton = document.createElement('button');
-      deleteButton.textContent = '削除';
-      deleteButton.className = 'button';
-      deleteButton.addEventListener('click', () => deleteLocation(loc));
-      locationItem.appendChild(locationText);
-      locationItem.appendChild(deleteButton);
-      container.appendChild(locationItem);
-    });
-  }
 
-  async function capturePhoto(stage) {
-    if (!currentLocation) return;
+    async function capturePhoto(stage) {
+      if (!currentLocation) return;
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(
-        {
-          video:
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(
           {
-            facingMode: {
-              exact: 'environment'
+            video:
+            {
+              facingMode: {
+                exact: 'environment'
+              }
             }
+          });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        await video.play();
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 300;  // Desired width
+        canvas.height = 200;  // Desired height
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const photoUrl = canvas.toDataURL('image/jpeg');
+        photos[currentLocation][stage] = photoUrl;
+
+        stream.getTracks().forEach(track => track.stop());
+        renderCards();
+      } catch (err) {
+        console.error('Error capturing photo:', err);
+        alert('写真のキャプチャ中にエラーが発生しました。');
+      }
+    }
+
+    function renderCards() {
+      const container = document.getElementById('cardsContainer');
+      container.innerHTML = '';
+      if (!currentLocation) return;
+      ['before', 'during', 'after'].forEach(stage => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const title = document.createElement('div');
+        title.className = 'card-title';
+        title.textContent = stage === 'before' ? '作業前' : stage === 'during' ? '作業中' : '作業後';
+        card.appendChild(title);
+        const imgContainer = document.createElement('div');
+        if (photos[currentLocation][stage]) {
+          const img = document.createElement('img');
+          img.src = photos[currentLocation][stage];
+          img.alt = `${stage} cleaning`;
+          imgContainer.appendChild(img);
+        } else {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'card-placeholder';
+          placeholder.textContent = '📷';
+          imgContainer.appendChild(placeholder);
+        }
+        card.appendChild(imgContainer);
+        const button = document.createElement('button');
+        button.className = 'button';
+        button.textContent = '写真を撮影';
+        button.addEventListener('click', () => capturePhoto(stage));
+        card.appendChild(button);
+        container.appendChild(card);
+      });
+    }
+
+    function deleteLocation(location) {
+      locations = locations.filter(loc => loc !== location);
+      delete photos[location];
+      if (currentLocation === location) {
+        currentLocation = '';
+        renderCards();
+      }
+      renderLocationOptions();
+    }
+
+    document.getElementById('saveButton').addEventListener('click', () => {
+      localStorage.setItem('cleaningPhotoLog', JSON.stringify({ locations, photos }));
+      alert('データが保存されました');
+    });
+
+    document.getElementById('loadButton').addEventListener('click', () => {
+      const data = localStorage.getItem('cleaningPhotoLog');
+      if (data) {
+        const parsedData = JSON.parse(data);
+        locations = parsedData.locations;
+        photos = parsedData.photos;
+        renderLocationOptions();
+        renderCards();
+        alert('データが読み出されました');
+      } else {
+        alert('保存されたデータが見つかりません');
+      }
+    });
+
+    document.getElementById('downloadButton').addEventListener('click', () => {
+      Object.entries(photos).forEach(([loc, stages]) => {
+        Object.entries(stages).forEach(([stage, photoUrl]) => {
+          if (photoUrl) {
+            const link = document.createElement('a');
+            const date = new Date().toISOString().split('T')[0];
+            link.href = photoUrl;
+            link.download = `${date}_${loc}_${stage}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
           }
         });
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      await video.play();
-
-      const canvas = document.createElement('canvas');
-      canvas.width = 300;  // Desired width
-      canvas.height = 200;  // Desired height
-      const context = canvas.getContext('2d');
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const photoUrl = canvas.toDataURL('image/jpeg');
-      photos[currentLocation][stage] = photoUrl;
-
-      stream.getTracks().forEach(track => track.stop());
-      renderCards();
-    } catch (err) {
-      console.error('Error capturing photo:', err);
-      alert('写真のキャプチャ中にエラーが発生しました。');
-    }
-  }
-
-  function renderCards() {
-    const container = document.getElementById('cardsContainer');
-    container.innerHTML = '';
-    if (!currentLocation) return;
-    ['before', 'during', 'after'].forEach(stage => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      const title = document.createElement('div');
-      title.className = 'card-title';
-      title.textContent = stage === 'before' ? '作業前' : stage === 'during' ? '作業中' : '作業後';
-      card.appendChild(title);
-      const imgContainer = document.createElement('div');
-      if (photos[currentLocation][stage]) {
-        const img = document.createElement('img');
-        img.src = photos[currentLocation][stage];
-        img.alt = `${stage} cleaning`;
-        imgContainer.appendChild(img);
-      } else {
-        const placeholder = document.createElement('div');
-        placeholder.className = 'card-placeholder';
-        placeholder.textContent = '📷';
-        imgContainer.appendChild(placeholder);
-      }
-      card.appendChild(imgContainer);
-      const button = document.createElement('button');
-      button.className = 'button';
-      button.textContent = '写真を撮影';
-      button.addEventListener('click', () => capturePhoto(stage));
-      card.appendChild(button);
-      container.appendChild(card);
-    });
-  }
-
-  function deleteLocation(location) {
-    locations = locations.filter(loc => loc !== location);
-    delete photos[location];
-    if (currentLocation === location) {
-      currentLocation = '';
-      renderCards();
-    }
-    renderLocationOptions();
-  }
-
-  document.getElementById('saveButton').addEventListener('click', () => {
-    localStorage.setItem('cleaningPhotoLog', JSON.stringify({ locations, photos }));
-    alert('データが保存されました');
-  });
-
-  document.getElementById('loadButton').addEventListener('click', () => {
-    const data = localStorage.getItem('cleaningPhotoLog');
-    if (data) {
-      const parsedData = JSON.parse(data);
-      locations = parsedData.locations;
-      photos = parsedData.photos;
-      renderLocationOptions();
-      renderCards();
-      alert('データが読み出されました');
-    } else {
-      alert('保存されたデータが見つかりません');
-    }
-  });
-
-  document.getElementById('downloadButton').addEventListener('click', () => {
-    Object.entries(photos).forEach(([loc, stages]) => {
-      Object.entries(stages).forEach(([stage, photoUrl]) => {
-        if (photoUrl) {
-          const link = document.createElement('a');
-          const date = new Date().toISOString().split('T')[0];
-          link.href = photoUrl;
-          link.download = `${date}_${loc}_${stage}.jpg`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
       });
     });
-  });
 
-  renderLocationOptions();
-</script>
+    renderLocationOptions();
+  </script>
 
 </body>
+
 </html>
