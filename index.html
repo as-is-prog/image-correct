@@ -43,14 +43,12 @@
 
     .card img {
       width: 100%;
-      height: 200px;
-      object-fit: cover;
+      object-fit: contain;
       margin-bottom: 10px;
     }
 
     .card-placeholder {
       width: 100%;
-      height: 200px;
       background-color: #e0e0e0;
       display: flex;
       align-items: center;
@@ -98,6 +96,8 @@
     let photos = {};
     let locations = [];
     let currentLocation = '';
+
+    const sleep = waitTime_ms => new Promise( resolve => setTimeout(resolve, waitTime_ms) );
 
     document.getElementById('locationSelect').addEventListener('change', (event) => {
       currentLocation = event.target.value;
@@ -155,10 +155,15 @@
       if (!currentLocation) return;
 
       try {
+        const img_width = 1280;
+        const img_height = 800;
+
         const stream = await navigator.mediaDevices.getUserMedia(
           {
             video:
             {
+              width: img_width,
+              height: img_height,
               facingMode: {
                 exact: 'environment'
               }
@@ -168,9 +173,11 @@
         video.srcObject = stream;
         await video.play();
 
+        await sleep(1000);
+
         const canvas = document.createElement('canvas');
-        canvas.width = 300;  // Desired width
-        canvas.height = 200;  // Desired height
+        canvas.width = img_width;  // Desired width
+        canvas.height = img_height;  // Desired height
         const context = canvas.getContext('2d');
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
@@ -185,6 +192,10 @@
       }
     }
 
+    function convertStageText(stage) {
+      return stage === 'before' ? '作業前' : stage === 'during' ? '作業中' : '作業後';
+    }
+
     function renderCards() {
       const container = document.getElementById('cardsContainer');
       container.innerHTML = '';
@@ -194,7 +205,7 @@
         card.className = 'card';
         const title = document.createElement('div');
         title.className = 'card-title';
-        title.textContent = stage === 'before' ? '作業前' : stage === 'during' ? '作業中' : '作業後';
+        title.textContent = convertStageText(stage);
         card.appendChild(title);
         const imgContainer = document.createElement('div');
         if (photos[currentLocation][stage]) {
@@ -229,11 +240,21 @@
     }
 
     document.getElementById('saveButton').addEventListener('click', () => {
+      let sel = window.confirm("セーブします");
+      if (!sel) {
+        return;
+      }
+
       localStorage.setItem('cleaningPhotoLog', JSON.stringify({ locations, photos }));
       alert('データが保存されました');
     });
 
     document.getElementById('loadButton').addEventListener('click', () => {
+      let sel = window.confirm("ロードします(今の作業中のデータは消えます)");
+      if (!sel) {
+        return;
+      }
+
       const data = localStorage.getItem('cleaningPhotoLog');
       if (data) {
         const parsedData = JSON.parse(data);
@@ -254,7 +275,7 @@
             const link = document.createElement('a');
             const date = new Date().toISOString().split('T')[0];
             link.href = photoUrl;
-            link.download = `${date}_${loc}_${stage}.jpg`;
+            link.download = `${date}_${loc}_${convertStageText(stage)}.jpg`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
