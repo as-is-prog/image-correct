@@ -67,6 +67,7 @@
       justify-content: space-between;
     }
   </style>
+  <script src="db.js"></script>
 </head>
 
 <body>
@@ -78,13 +79,13 @@
       <select id="locationSelect" class="select">
         <option value="" selected disabled>作業場所を選択</option>
       </select>
-      <button id="addLocationButton" class="button">＋</button>
-      <button id="removeLocationButton" class="button">−</button>
+      <button id="addLocationButton" class="button">追加</button>
+      <button id="removeLocationButton" class="button">削除</button>
     </div>
 
     <div class="flex">
       <button id="saveButton" class="button">保存</button>
-      <button id="loadButton" class="button">読み出し</button>
+      <button id="loadButton" class="button" style="display: none;">読み出し</button>
       <button id="downloadButton" class="button">すべての写真をダウンロード</button>
     </div>
 
@@ -93,6 +94,10 @@
   </div>
 
   <script>
+    openDatabase();
+
+    loadAction();
+
     let photos = {};
     let locations = [];
     let currentLocation = '';
@@ -239,31 +244,44 @@
       renderLocationOptions();
     }
 
-    document.getElementById('saveButton').addEventListener('click', () => {
+    document.getElementById('saveButton').addEventListener('click', async () => {
       let sel = window.confirm("セーブします");
       if (!sel) {
         return;
       }
 
-      localStorage.setItem('cleaningPhotoLog', JSON.stringify({ locations, photos }));
-      alert('データが保存されました');
+      const data = { locations, photos };
+      try {
+        await saveData(data);
+        alert('データが保存されました');
+      } catch (error) {
+        console.error('データの保存に失敗しました', error);
+        alert('データの保存に失敗しました');
+      }
     });
 
-    document.getElementById('loadButton').addEventListener('click', () => {
-      let sel = window.confirm("ロードします(今の作業中のデータは消えます)");
-      if (!sel) {
-        return;
-      }
-
-      const data = localStorage.getItem('cleaningPhotoLog');
+    async function loadAction() {
+      const data = await loadData();
       if (data) {
-        const parsedData = JSON.parse(data);
+        const parsedData = data;
         locations = parsedData.locations;
         photos = parsedData.photos;
         renderLocationOptions();
         renderCards();
-        alert('データが読み出されました');
+        return true;
       } else {
+        return false;
+      }
+    }
+
+    document.getElementById('loadButton').addEventListener('click', async () => {
+      let sel = window.confirm("ロードします(今の作業中のデータは消えます)");
+      if (!sel) {
+        return;
+      }
+      if (await loadAction()) {
+        alert('データが読み出されました');
+      } else {        
         alert('保存されたデータが見つかりません');
       }
     });
