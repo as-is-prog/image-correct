@@ -156,6 +156,9 @@
       select.value = currentLocation;
     }
 
+    let activeStream = null;
+    let isPreviewMode = {};
+
     async function capturePhoto(stage) {
       if (!currentLocation) return;
 
@@ -163,37 +166,58 @@
         const img_width = 1280;
         const img_height = 800;
 
-        const stream = await navigator.mediaDevices.getUserMedia(
-          {
-            video:
-            {
+        if (!isPreviewMode[stage]) {
+          // プレビューモードを開始
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
               width: img_width,
               height: img_height,
-              facingMode: {
-                exact: 'environment'
-              }
+              facingMode: 'environment'  // exactの制約を削除
             }
           });
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        await video.play();
 
-        await sleep(1000);
+          // プレビューモードを開始する前にUIを更新
+          isPreviewMode[stage] = true;
+          renderCards();
 
-        const canvas = document.createElement('canvas');
-        canvas.width = img_width;  // Desired width
-        canvas.height = img_height;  // Desired height
-        const context = canvas.getContext('2d');
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          // この時点でvideo要素が作成されているはず
+          const videoElement = document.getElementById(`preview-${stage}`);
+          if (!videoElement) {
+            throw new Error('Video element not found');
+          }
 
-        const photoUrl = canvas.toDataURL('image/jpeg');
-        photos[currentLocation][stage] = photoUrl;
+          videoElement.srcObject = stream;
+          await videoElement.play();
+          
+          activeStream = stream;
+        } else {
+          // 写真を撮影
+          const videoElement = document.getElementById(`preview-${stage}`);
+          const canvas = document.createElement('canvas');
+          canvas.width = img_width;
+          canvas.height = img_height;
+          const context = canvas.getContext('2d');
+          context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
-        stream.getTracks().forEach(track => track.stop());
-        renderCards();
+          const photoUrl = canvas.toDataURL('image/jpeg');
+          photos[currentLocation][stage] = photoUrl;
+
+          // ストリームを停止
+          if (activeStream) {
+            activeStream.getTracks().forEach(track => track.stop());
+            activeStream = null;
+          }
+          isPreviewMode[stage] = false;
+          renderCards();
+        }
       } catch (err) {
         console.error('Error capturing photo:', err);
         alert('写真のキャプチャ中にエラーが発生しました。');
+        isPreviewMode[stage] = false;
+        if (activeStream) {
+          activeStream.getTracks().forEach(track => track.stop());
+          activeStream = null;
+        }
       }
     }
 
@@ -212,22 +236,35 @@
         title.className = 'card-title';
         title.textContent = convertStageText(stage);
         card.appendChild(title);
+        
         const imgContainer = document.createElement('div');
-        if (photos[currentLocation][stage]) {
+        if (isPreviewMode[stage]) {
+          // プレビュー表示
+          const video = document.createElement('video');
+          video.id = `preview-${stage}`;
+          video.style.width = '100%';
+          video.style.height = 'auto';
+          video.autoplay = true;
+          video.playsInline = true;
+          imgContainer.appendChild(video);
+        } else if (photos[currentLocation][stage]) {
+          // 撮影済み写真表示
           const img = document.createElement('img');
           img.src = photos[currentLocation][stage];
           img.alt = `${stage} cleaning`;
           imgContainer.appendChild(img);
         } else {
+          // プレースホルダー表示
           const placeholder = document.createElement('div');
           placeholder.className = 'card-placeholder';
           placeholder.textContent = '📷';
           imgContainer.appendChild(placeholder);
         }
         card.appendChild(imgContainer);
+
         const button = document.createElement('button');
         button.className = 'button';
-        button.textContent = '写真を撮影';
+        button.textContent = isPreviewMode[stage] ? '撮影する' : '写真を撮影';
         button.addEventListener('click', () => capturePhoto(stage));
         card.appendChild(button);
         container.appendChild(card);
